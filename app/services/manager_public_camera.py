@@ -84,7 +84,29 @@ class RTSPProcess:
                 if rtsp_url is None:
                     time.sleep(1)
                     continue
+                
+                if settings.DAHUA_IP_REPLACE is not None or settings.DAHUA_PORT_REPLACE is not None:
+                    from urllib.parse import urlparse, urlunparse
+                    parsed = urlparse(rtsp_url)
+                    hostname = settings.DAHUA_IP_REPLACE if settings.DAHUA_IP_REPLACE is not None else parsed.hostname
+                    port = settings.DAHUA_PORT_REPLACE if settings.DAHUA_PORT_REPLACE is not None else parsed.port
+                    
+                    netloc = ""
+                    if parsed.username:
+                        netloc += f"{parsed.username}"
+                        if parsed.password:
+                            netloc += f":{parsed.password}"
+                        netloc += "@"
+                    netloc += f"{hostname}"
+                    if port:
+                        netloc += f":{port}"
+                        
+                    parsed = parsed._replace(netloc=netloc)
+                    rtsp_url = urlunparse(parsed)
+
                 print("Starting FFmpeg with RTSP URL: {}".format(rtsp_url))
+                #rtsp://192.168.105.15:9100/mediaServer/monitor/param/cameraid=1000000%240%26substream=1?token=18
+                # relace ip and port
                 self.process = self.start_rtsp_process(rtsp_url, output_url)
 
             if self.process.stderr:
