@@ -1,0 +1,7 @@
+# FastAPI
+fastapi[standard]
+pydantic-settings
+# Database
+sqlalchemy
+cryptography
+requests
