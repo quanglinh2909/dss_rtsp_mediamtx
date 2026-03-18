@@ -71,7 +71,7 @@ class RTSPProcess:
         if self.process is not None:
             self.process.kill()
 
-    def monitor_process(self, channel_id, output_url):
+    def monitor_process(self, channel_id, output_url,streamType):
 
         threading.Thread(target=self.check_process, daemon=True).start()
 
@@ -80,17 +80,17 @@ class RTSPProcess:
             if self.process is None or self.process.poll() is not None:
                 print("FFmpeg process exited, restarting...")
                 self.set_status(StatusCameraEnum.RESTARTING)
-                rtsp_url = login_dahua_service.get_rtsp(channel_id)
+                rtsp_url = login_dahua_service.get_rtsp(channel_id,streamType)
                 if rtsp_url is None:
                     time.sleep(1)
                     continue
-                
+
                 if settings.DAHUA_IP_REPLACE is not None or settings.DAHUA_PORT_REPLACE is not None:
                     from urllib.parse import urlparse, urlunparse
                     parsed = urlparse(rtsp_url)
                     hostname = settings.DAHUA_IP_REPLACE if settings.DAHUA_IP_REPLACE is not None else parsed.hostname
                     port = settings.DAHUA_PORT_REPLACE if settings.DAHUA_PORT_REPLACE is not None else parsed.port
-                    
+
                     netloc = ""
                     if parsed.username:
                         netloc += f"{parsed.username}"
@@ -100,7 +100,7 @@ class RTSPProcess:
                     netloc += f"{hostname}"
                     if port:
                         netloc += f":{port}"
-                        
+
                     parsed = parsed._replace(netloc=netloc)
                     rtsp_url = urlunparse(parsed)
 
@@ -129,23 +129,33 @@ class ManagerPublicCamera:
 
     def add_camera(self, id_camera, channel_id, id_camera_vms):
 
-        output_url = f"rtsp://{settings.IP_MEDIA_MTX}:{settings.PORT_MEDIA_MTX}/live/liveStream_{id_camera_vms}_0_0"
-        print(output_url)
+        output_url_main = f"rtsp://{settings.IP_MEDIA_MTX}:{settings.PORT_MEDIA_MTX}/live/liveStream_{id_camera_vms}_0_0"
+        output_url_sub = f"rtsp://{settings.IP_MEDIA_MTX}:{settings.PORT_MEDIA_MTX}/live/liveStream_{id_camera_vms}_0_1"
         self.delete_camera(id_camera)
 
-        rtsp_process = RTSPProcess(id_camera=id_camera)
-        threading.Thread(target=rtsp_process.monitor_process, args=(channel_id,output_url,), daemon=True).start()
-        self.list_camera[id_camera] = rtsp_process
-        self.list_output_url[id_camera] = output_url
+        rtsp_process_main = RTSPProcess(id_camera=id_camera)
+        threading.Thread(target=rtsp_process_main.monitor_process, args=(channel_id, output_url_main, "1"), daemon=True).start()
+
+        rtsp_process_sub = RTSPProcess(id_camera=id_camera)
+        threading.Thread(target=rtsp_process_sub.monitor_process, args=(channel_id, output_url_sub, "2"), daemon=True).start()
+
+        self.list_camera[id_camera] = [rtsp_process_main, rtsp_process_sub]
+        self.list_output_url[id_camera] = [output_url_main, output_url_sub]
 
     def delete_camera(self, id_camera):
         from app.services.camera_service import camera_service
         id_camera = str(id_camera)
         if id_camera in self.list_camera:
             camera_service.update(id_camera, status=StatusCameraEnum.OFFLINE)
-            self.list_camera[id_camera].stop()
+            processes = self.list_camera[id_camera]
+            if isinstance(processes, list):
+                for p in processes:
+                    p.stop()
+            else:
+                processes.stop()
             del self.list_camera[id_camera]
-            del self.list_output_url[id_camera]
+            if id_camera in self.list_output_url:
+                del self.list_output_url[id_camera]
 
     def delete_all_camera(self):
         print("Deleting all cameras...", self.list_camera)

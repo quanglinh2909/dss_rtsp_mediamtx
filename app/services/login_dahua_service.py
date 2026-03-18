@@ -138,7 +138,7 @@ class LoginDahuaService:
             print(f"Exception khi đăng nhập: {e}")
             return None
 
-    def get_rtsp(self,channel_id):
+    def get_rtsp(self,channel_id,streamType):
         response = self.login()
         if response:
             token_value = response.token_value
@@ -150,7 +150,7 @@ class LoginDahuaService:
                 "method": "MTS.Video.StartVideo",
                 "token": token_value,
                 "data": {
-                    "streamType": "1",
+                    "streamType": streamType,
                     "trackId": "",
                     "extend": "",
                     "channelId":channel_id,
@@ -184,5 +184,5 @@ class LoginDahuaService:
 login_dahua_service = LoginDahuaService()
 
 if __name__ == '__main__':
-    response = login_dahua_service.get_rtsp()
+    response = login_dahua_service.get_rtsp("1", "1")
     print(response)
