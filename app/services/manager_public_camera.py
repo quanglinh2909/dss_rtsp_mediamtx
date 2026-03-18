@@ -84,6 +84,7 @@ class RTSPProcess:
                 if rtsp_url is None:
                     time.sleep(1)
                     continue
+                print("Starting FFmpeg with RTSP URL: {}".format(rtsp_url))
                 self.process = self.start_rtsp_process(rtsp_url, output_url)
 
             if self.process.stderr:
